@@ -69,3 +69,7 @@ firebase-adminsdk*.json
 # =========================
 .cache/
 tmp/
+# =========================
+# Agent uploads (multer temp dir) and eval caches
+# =========================
+**/temp/
