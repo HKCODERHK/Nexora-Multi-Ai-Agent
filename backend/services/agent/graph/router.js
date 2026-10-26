@@ -1,5 +1,6 @@
 import { getModel } from "../config/llmModels.js"
-import { agent } from "../controllers/agent.controller.js"
+
+export const ROUTABLE_AGENTS = ["chat", "search", "coding", "pdf", "ppt", "vision"]
 
 export const router = async (state) => {
 
@@ -89,12 +90,12 @@ User Query:
 `
 
   const response = await llm.invoke(prompt)
+  const choice = String(response?.content ?? "").trim().toLowerCase()
 
   return {
     ...state,
-    agent: response.content
-      .trim()
-      .toLowerCase()
+    // the LLM's answer is untrusted text: only accept a known agent name
+    agent: ROUTABLE_AGENTS.includes(choice) ? choice : "chat"
   }
 
 
