@@ -1,8 +1,27 @@
 import { getAuth } from "firebase-admin/auth"
 import { app } from "../config/firebase.js"
 import User from "../models/user.model.js"
-import { createConnection } from "mongoose"
+import mongoose from "mongoose"
 import redis from "../../../shared/redis/redis.js"
+
+const SESSION_TTL = 7 * 24 * 60 * 60
+
+// Rewrite the cached session so the UI sees the new plan/credits.
+// Skips users who are not logged in (no session id), instead of writing "session-null".
+const refreshSession = async (user) => {
+    const sessionId = await redis.get(`user-session-${user._id}`)
+    if (!sessionId) return
+    await redis.set(`session-${sessionId}`, JSON.stringify({
+        userId: user._id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        plan: user.plan,
+        credits: user.credits,
+        totalCredits: user.totalCredits,
+        planExpiresAt: user.planExpiresAt
+    }), "EX", SESSION_TTL)
+}
 
 export const login = async (req, res) => {
     try {
@@ -70,28 +89,24 @@ export const logOut = async (req, res) => {
 export const updateUserPayment = async (req, res) => {
     try {
         const { plan, credits, userId } = req.body
-        const user = await User.findById(userId)
+        if (!mongoose.isValidObjectId(userId)) {
+            return res.status(404).json({ message: "User not found" })
+        }
+        // $inc instead of read-add-save: a credit deduction running at the same
+        // moment can no longer be overwritten by a stale balance.
+        const user = await User.findByIdAndUpdate(
+            userId,
+            {
+                $set: { plan, planExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
+                $inc: { credits, totalCredits: credits }
+            },
+            { returnDocument: "after" }
+        )
         if (!user) {
             return res.status(404).json({ message: "User not found" })
         }
-        user.plan = plan
-        user.credits += credits
-        user.totalCredits += credits
-        user.planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        await user.save()
 
-        const sessionId = await redis.get(`user-session-${user?._id}`)
-        console.log("sessionId", sessionId)
-        await redis.set(`session-${sessionId}`, JSON.stringify({
-            userId: user._id,
-            name: user.name,
-            email: user.email,
-            avatar: user.avatar,
-            plan: user.plan,
-            credits: user.credits,
-            totalCredits: user.totalCredits,
-            planExpiresAt: user.planExpiresAt
-        }), "EX", 7 * 24 * 60 * 60)
+        await refreshSession(user)
 
         return res.status(200).json({ success: true })
 
@@ -101,54 +116,46 @@ export const updateUserPayment = async (req, res) => {
 }
 
 
+// Cost in credits per agent call; anything not listed costs 1.
+export const COST = {
+    chat: 1,
+    search: 5,
+    coding: 10,
+    pdf: 10,
+    ppt: 10,
+    vision: 10
+}
+
 export const deductCredits = async (req, res) => {
     try {
         const { userId, agent } = req.body
-        
-        const COST = {
+        const requiredCredits = COST[agent] || 1
 
-            chat: 1,
-
-            search: 5,
-
-            coding: 10,
-
-            pdf: 10,
-
-            ppt: 10,
-
-            vision: 10
-
-        };
-
-        const user=await User.findById(userId)
-
-        if(!user){
-            return res.status(400).json({message:"user not found"})
+        if (!mongoose.isValidObjectId(userId)) {
+            return res.status(404).json({ message: "user not found" })
         }
 
-       const requiredCredits=COST[agent] || 1
-        if(user.credits<requiredCredits){
-         return res.status(400).json({message:"Not enough credits."})
+        // One atomic operation: the check (credits >= cost) and the decrement happen
+        // together inside MongoDB, so two parallel requests can never both pass the
+        // check and push the balance below zero.
+        const user = await User.findOneAndUpdate(
+            { _id: userId, credits: { $gte: requiredCredits } },
+            { $inc: { credits: -requiredCredits } },
+            { returnDocument: "after" }
+        )
+
+        if (!user) {
+            const exists = await User.exists({ _id: userId })
+            if (!exists) {
+                return res.status(404).json({ message: "user not found" })
+            }
+            return res.status(400).json({ message: "Not enough credits." })
         }
-        user.credits-=requiredCredits
-        await user.save()
 
-       const sessionId = await redis.get(`user-session-${user?._id}`)
-        console.log("sessionId", sessionId)
-        await redis.set(`session-${sessionId}`, JSON.stringify({
-            userId: user._id,
-            name: user.name,
-            email: user.email,
-            avatar: user.avatar,
-            plan: user.plan,
-            credits: user.credits,
-            totalCredits: user.totalCredits,
-            planExpiresAt: user.planExpiresAt
-        }), "EX", 7 * 24 * 60 * 60)
+        await refreshSession(user)
 
-        return res.status(200).json({ success: true ,credits:user.credits})
+        return res.status(200).json({ success: true, credits: user.credits })
     } catch (error) {
- return res.status(500).json({ message: `deduct credits error ${error}` })
+        return res.status(500).json({ message: `deduct credits error ${error}` })
     }
 }
