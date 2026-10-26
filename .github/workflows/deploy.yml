@@ -4,6 +4,10 @@ on:
  push:
    branches:
      - main
+ # pull requests only run the tests; the deploy jobs below are skipped for them
+ pull_request:
+   branches:
+     - main
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -11,7 +15,37 @@ env:
 
 jobs: 
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            backend/gateway/package-lock.json
+            backend/services/agent/package-lock.json
+            backend/services/auth/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix backend/gateway
+          npm ci --prefix backend/services/agent
+          npm ci --prefix backend/services/auth
+
+      - name: Run tests
+        working-directory: backend
+        run: npm test
+
   deploy-backend:
+     needs: test
+     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
      runs-on: ubuntu-latest 
      steps:
       - name: Checkout
@@ -138,6 +172,7 @@ jobs:
 
   deploy-frontend:
     needs: deploy-backend
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest 
     steps:
       - name: Checkout
