@@ -1,11 +1,9 @@
-import fs, { stat } from "fs"
+import fs from "fs"
 import {PDFParse} from "pdf-parse"
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters"
-import { vectorStore } from "../config/vectorDb.js"
-import { getModel } from "../config/llmModels.js"
-import { HumanMessage, SystemMessage } from "@langchain/core/messages"
 import { deductCredits } from "../utils/deductCredits.js"
 import { checkAgentLimit } from "../config/agentLimit.js"
+import { indexDocument, retrieve, answerFromContext, DEFAULT_CHUNKING, DEFAULT_RETRIEVAL } from "../rag/index.js"
+
 export const pdfRag=async (state)=>{
    try {
     await checkAgentLimit(state.userId,"pdf")
@@ -17,50 +15,19 @@ export const pdfRag=async (state)=>{
       const result=await pdf.getText()
       const text=result.text
 
-      const spilliter=new RecursiveCharacterTextSplitter({
-        chunkSize:1000,
-        chunkOverlap:200
+      // same PDF + same chunk settings reuses its Qdrant collection instead of re-embedding
+      const { collectionName }=await indexDocument(text,{
+        ...DEFAULT_CHUNKING,
+        source:state.file.originalname
       })
 
-      const docs=await spilliter.createDocuments([text])
-      const collectionName=`pdf-${Date.now()}`;
-      const store=await vectorStore(docs,collectionName)
+      const chunks=await retrieve(state.prompt,{ collectionName, ...DEFAULT_RETRIEVAL })
 
-      const relevantDocs=await store.similaritySearch(state.prompt,5)
-      
-      const context=relevantDocs.map(d=>d.pageContent).join("\n\n")
-      
-      const llm=await getModel("pdf-rag")
-
-       const messages=[
-        new SystemMessage(`You are NEXORA AI PDF Assistant.
-
-Rules:
-
-- Answer ONLY from the uploaded PDF.
-
-- Never make up information.
-
-- If the answer is not present in the PDF, reply:
-
-"I couldn't find this information in the uploaded PDF."
-
-- Use Markdown formatting.
-`),
-
-new HumanMessage(`
-    Context:${context}
-     Question:${state.prompt}
-    `)
-       ]
-
-
-      const response=await llm.invoke(messages)
+      const answer=await answerFromContext(state.prompt,chunks)
       await deductCredits(state.userId,"pdf")
-      console.log(response)
       return {
         ...state,
-        aiResponse:response.content
+        aiResponse:answer
       }
 
 
@@ -72,7 +39,7 @@ new HumanMessage(`
             aiResponse:error?.data?.message || "failed to analyze pdf"
         }
    }finally{
-         fs.unlinkSync(state.file.path)
+         fs.rmSync(state.file.path,{ force:true })
    }
 
 
