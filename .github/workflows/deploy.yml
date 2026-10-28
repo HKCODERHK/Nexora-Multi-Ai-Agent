@@ -31,6 +31,7 @@ jobs:
             backend/gateway/package-lock.json
             backend/services/agent/package-lock.json
             backend/services/auth/package-lock.json
+            backend/mcp/package-lock.json
 
       - name: Install dependencies
         run: |
@@ -38,6 +39,10 @@ jobs:
           npm ci --prefix backend/gateway
           npm ci --prefix backend/services/agent
           npm ci --prefix backend/services/auth
+          npm ci --prefix backend/mcp
+
+      - name: Type-check and build the MCP server
+        run: npm run build --prefix backend/mcp
 
       - name: Run tests
         working-directory: backend

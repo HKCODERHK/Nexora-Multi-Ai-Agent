@@ -2,3 +2,4 @@ export { indexDocument, splitText, collectionNameFor, DEFAULT_CHUNKING, COLLECTI
 export { retrieve, DEFAULT_RETRIEVAL, RETRIEVAL_MODES } from "./retrieve.js"
 export { answerFromContext, NOT_FOUND_ANSWER } from "./answer.js"
 export { configureRag, resetRag } from "./clients.js"
+export { extractPdfText } from "./pdfText.js"

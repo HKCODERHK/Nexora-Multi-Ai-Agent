@@ -1,0 +1,24 @@
+{
+  "name": "nexora-mcp",
+  "version": "1.0.0",
+  "description": "MCP server exposing Nexora's hybrid document search over stdio",
+  "license": "ISC",
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "nexora-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
+}
