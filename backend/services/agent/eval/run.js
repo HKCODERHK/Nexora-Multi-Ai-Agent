@@ -97,10 +97,11 @@ const main = async () => {
                 "| Date | Config | Label | hit@5 | MRR | Correctness | LLM judge (2nd opinion) | Time |\n|---|---|---|---|---|---|---|---|\n"
         )
     }
-    fs.appendFileSync(
-        resultsMd,
-        `| ${date} | ${config} | ${args.label || "-"} | ${pct(summary.hitAt5)} | ${summary.mrr.toFixed(3)} | ${pct(summary.correctness)} | ${summary.judge === null ? "-" : pct(summary.judge)} | ${seconds.toFixed(0)}s |\n`
-    )
+    const row = `| ${date} | ${config} | ${args.label || "-"} | ${pct(summary.hitAt5)} | ${summary.mrr.toFixed(3)} | ${pct(summary.correctness)} | ${summary.judge === null ? "-" : pct(summary.judge)} | ${seconds.toFixed(0)}s |\n`
+    // keep RAG rows in the first table, above the injection section
+    const md = fs.readFileSync(resultsMd, "utf8")
+    const injectionAt = md.indexOf("\n## Prompt-injection attacks")
+    fs.writeFileSync(resultsMd, injectionAt === -1 ? md + row : `${md.slice(0, injectionAt).trimEnd()}\n${row}${md.slice(injectionAt)}`)
 
     console.log(`\n${config}: hit@${k} ${pct(summary.hitAt5)} · MRR ${summary.mrr.toFixed(3)} · correctness ${pct(summary.correctness)}${summary.judge === null ? "" : ` · judge ${pct(summary.judge)}`} · ${seconds.toFixed(0)}s`)
     console.log(`cache: embeddings ${stats.embeddingHits} hit / ${stats.embeddingMisses} new · LLM ${stats.llmHits} hit / ${stats.llmMisses} new`)
