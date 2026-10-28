@@ -36,6 +36,8 @@ services:
     dockerfilePath: ./backend/gateway/Dockerfile
     dockerContext: ./backend
     envVars:
+      - key: INTERNAL_API_KEY            # same value on gateway, auth, chat, agent, billing
+        sync: false
       - key: FRONTEND_URL
         value: https://nexora-hk.onrender.com
       - key: AUTH_SERVICE
@@ -61,6 +63,8 @@ services:
     dockerContext: ./backend
     dockerCommand: sh -c "cp /etc/secrets/serviceAccountKey.json ./serviceAccountKey.json; npm start"
     envVars:
+      - key: INTERNAL_API_KEY            # same value on gateway, auth, chat, agent, billing
+        sync: false
       - key: MONGODB_URI
         sync: false
       - key: REDIS_URL
@@ -77,6 +81,8 @@ services:
     dockerfilePath: ./backend/services/chat/Dockerfile
     dockerContext: ./backend
     envVars:
+      - key: INTERNAL_API_KEY            # same value on gateway, auth, chat, agent, billing
+        sync: false
       - key: MONGODB_URI
         sync: false
 
@@ -88,6 +94,8 @@ services:
     dockerfilePath: ./backend/services/agent/Dockerfile
     dockerContext: ./backend
     envVars:
+      - key: INTERNAL_API_KEY            # same value on gateway, auth, chat, agent, billing
+        sync: false
       - key: CHAT_SERVICE
         value: https://nexora-hk-chat.onrender.com
       - key: AUTH_SERVICE
@@ -128,6 +136,8 @@ services:
     dockerfilePath: ./backend/services/billing/Dockerfile
     dockerContext: ./backend
     envVars:
+      - key: INTERNAL_API_KEY            # same value on gateway, auth, chat, agent, billing
+        sync: false
       - key: AUTH_SERVICE
         value: https://nexora-hk-auth.onrender.com
       - key: MONGODB_URI
