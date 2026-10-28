@@ -40,6 +40,19 @@ describe("retrieve", () => {
         expect(embeddings.queryCalls).toBe(1)
     })
 
+    it("hybrid mode fuses vector and keyword results", async () => {
+        const out = await retrieve("NX-4021", { collectionName, k: 2, mode: "hybrid" })
+        expect(out[0].text).toContain("NX-4021")
+        expect(out).toHaveLength(2)
+        // RRF score of a chunk ranked 1st in both lists = 2 / 61
+        expect(out[0].score).toBeCloseTo(2 / 61, 5)
+    })
+
+    it("hybrid mode still works when the query has no keywords", async () => {
+        const out = await retrieve("the of and", { collectionName, k: 2, mode: "hybrid" })
+        expect(out).toHaveLength(2)
+    })
+
     it("rejects an unknown mode and a missing collection", async () => {
         await expect(retrieve("x", { collectionName, mode: "magic" })).rejects.toThrow(/Unknown retrieval mode/)
         await expect(retrieve("x", {})).rejects.toThrow(/collectionName/)
