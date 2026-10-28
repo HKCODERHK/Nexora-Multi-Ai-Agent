@@ -73,3 +73,4 @@ tmp/
 # Agent uploads (multer temp dir) and eval caches
 # =========================
 **/temp/
+backend/services/agent/eval/.cache/

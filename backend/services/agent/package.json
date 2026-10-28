@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon index.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "eval": "node eval/run.js",
+    "eval:injection": "node eval/injection.js",
+    "rag:cleanup": "node scripts/cleanupCollections.js"
   },
   "keywords": [],
   "author": "",
